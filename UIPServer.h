@@ -36,12 +36,19 @@
   #include "mbed/Print.h"
   #include "mbed/Server.h"
 #endif
+#if defined(STM32F103xB)
+  #include "mbed/Print.h"
+  #include "mbed/Server.h"
+#endif
 #include "UIPClient.h"
 
 #if defined(ARDUINO) && (defined(ARDUINO_ARCH_STM32) || !defined(STM32F3)) && !defined(__RFduino__)
   class UIPServer : public Server {
 #endif
 #if defined(__MBED__) || (!defined(ARDUINO_ARCH_STM32) && defined(STM32F3)) || defined(__RFduino__)
+  class UIPServer : public Print, public Server {
+#endif
+#if defined(STM32F103xB)
   class UIPServer : public Print, public Server {
 #endif
 public:

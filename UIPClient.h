@@ -33,6 +33,10 @@
   #include "mbed/Print.h"
   #include "mbed/Client.h"
 #endif
+#if defined(STM32F103xB)
+  #include "mbed/Print.h"
+  #include "mbed/Client.h"
+#endif
 #include "utility/mempool.h"
 #include "utility/logging.h"
 
@@ -75,6 +79,9 @@ typedef struct {
   class UIPClient : public Client {
 #endif
 #if defined(__MBED__) || (!defined(ARDUINO_ARCH_STM32) && defined(STM32F3)) || defined(__RFduino__)
+  class UIPClient : public Print, public Client {
+#endif
+#if defined(STM32F103xB)
   class UIPClient : public Print, public Client {
 #endif
 public:

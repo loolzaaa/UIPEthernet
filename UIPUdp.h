@@ -39,6 +39,10 @@
   #include "mbed/Print.h"
   #include "mbed/Udp.h"
 #endif
+#if defined(STM32F103xB)
+  #include "mbed/Print.h"
+  #include "mbed/Udp.h"
+#endif
 #include "utility/mempool.h"
 extern "C" {
   #include "utility/uip.h"
@@ -60,6 +64,9 @@ typedef struct {
   class UIPUDP : public UDP {
 #endif
 #if defined(__MBED__) || (!defined(ARDUINO_ARCH_STM32) && defined(STM32F3)) || defined(__RFduino__)
+  class UIPUDP : public Print, public UDP {
+#endif
+#if defined(STM32F103xB)
   class UIPUDP : public Print, public UDP {
 #endif
 private:

@@ -24,6 +24,10 @@
 #if defined(__MBED__)
   #include "mbed/millis.h"
 #endif
+#if defined(STM32F103xB)
+  #include "stm32f1xx_hal.h"
+  #define millis() HAL_GetTick()
+#endif
 #include "clock-arch.h"
 
 extern "C" {

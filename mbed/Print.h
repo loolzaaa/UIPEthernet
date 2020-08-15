@@ -41,6 +41,10 @@
   #include "WString.h"
   #include "Printable.h"
 #endif
+#if defined(STM32F103xB)
+  #include "mbed/WString.h"
+  #include "mbed/Printable.h"
+#endif
 
 #define DEC 10
 #define HEX 16

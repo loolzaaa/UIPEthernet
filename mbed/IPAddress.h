@@ -32,6 +32,10 @@
   #include "WString.h"
 #endif
 
+#if defined(STM32F103xB)
+  #include "mbed/Printable.h"
+  #include "mbed/WString.h"
+#endif
 // A class to make it easier to handle and pass around IP addresses
 
 class IPAddress : public Printable {

@@ -30,6 +30,12 @@
   #include "WString.h"
 #endif
 
+#if defined(STM32F103xB)
+  #include "mbed/WString.h"
+  #include "mbed/itoa.h"
+  #include "mbed/dtostrf.h"
+#endif
+
 /*********************************************/
 /*  Constructors                             */
 /*********************************************/

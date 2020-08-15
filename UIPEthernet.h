@@ -32,6 +32,11 @@
     #include "IPAddress.h"
   #endif
 #endif
+#if defined(STM32F103xB)
+  #include "stm32f1xx_hal.h"
+  #include "mbed/IPAddress.h"
+  #define millis() HAL_GetTick()
+#endif
 #include "utility/Enc28J60Network.h"
 #include "utility/uipopt.h"
 #include "Dhcp.h"
@@ -80,11 +85,21 @@ public:
 
   void init(const uint8_t pin);
 
+#if defined(STM32F103xB)  
+  int begin(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac);
+  void begin(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac, IPAddress ip);
+  void begin(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac, IPAddress ip, IPAddress dns);
+  void begin(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac, IPAddress ip, IPAddress dns,
+			IPAddress gateway);
+  void begin(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac, IPAddress ip, IPAddress dns,
+			IPAddress gateway, IPAddress subnet);
+#else
   int begin(const uint8_t* mac);
   void begin(const uint8_t* mac, IPAddress ip);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway);
   void begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet);
+#endif
 
   // maintain() must be called at regular intervals to process the incoming serial
   // data and issue IP events to the sketch.  It does not return until all IP
@@ -110,8 +125,14 @@ private:
   #endif
   static unsigned long periodic_timer;
 
+#if defined(STM32F103xB)
+  static void netInit(const SPI_HandleTypeDef *spiStruct, const uint8_t *mac);
+	static void configure(IPAddress ip, IPAddress dns, IPAddress gateway,
+			IPAddress subnet);
+#else
   static void netInit(const uint8_t* mac);
   static void configure(IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet);
+#endif
 
   static void tick();
 

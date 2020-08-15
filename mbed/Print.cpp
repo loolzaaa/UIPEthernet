@@ -34,6 +34,10 @@
   #include "mbed/Print.h"
 #endif
 
+#if defined(STM32F103xB)
+  #include "mbed/Print.h"
+#endif
+
 // Public Methods //////////////////////////////////////////////////////////////
 
 /* default implementation: may be overridden */

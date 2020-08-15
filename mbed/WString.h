@@ -36,6 +36,10 @@
   #include <avr/pgmspace.h>
 #endif
 
+#if defined(STM32F103xB)
+  #include <mbed/pgmspace.h>
+#endif
+
 // When compiling programs with this class, the following gcc parameters
 // dramatically increase performance and memory (RAM) efficiency, typically
 // with little or no increase in code size.

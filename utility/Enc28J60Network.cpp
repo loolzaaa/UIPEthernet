@@ -90,6 +90,10 @@ extern "C" {
 #define waitspi() while(!(SPSR&(1<<SPIF)))
 #endif
 
+#if defined(STM32F103xB)
+  extern SPI_HandleTypeDef hspi1;
+#endif
+
 uint16_t Enc28J60Network::nextPacketPtr;
 uint8_t Enc28J60Network::bank=0xff;
 uint8_t Enc28J60Network::erevid=0;
@@ -99,8 +103,15 @@ struct memblock Enc28J60Network::receivePkt;
 bool Enc28J60Network::broadcast_enabled = false;
 
 
+#if defined(STM32F103xB)
+void Enc28J60Network::init(const SPI_HandleTypeDef *spiStruct, uint8_t* macaddr)
+#else
 void Enc28J60Network::init(uint8_t* macaddr)
+#endif
 {
+#if defined(STM32F103xB)
+  hspi1 = *spiStruct;
+#endif
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("Enc28J60Network::init(uint8_t* macaddr) DEBUG_V3:Function started"));
   #endif
@@ -117,10 +128,14 @@ void Enc28J60Network::init(uint8_t* macaddr)
   #if defined(__MBED__)
   	 millis_start(); 
   #endif
+#if defined(STM32F103xB)
+  SS_DESELECT();
+#else
   CSPASSIVE; // ss=0
+#endif
   //
 
-  #if ACTLOGLEVEL>=LOG_DEBUG
+  #if ACTLOGLEVEL>=LOG_DEBUG && (defined(ARDUINO) || defined(__MBED__))
     LogObject.uart_send_str(F("ENC28J60::init DEBUG:csPin = "));
     LogObject.uart_send_decln(ENC28J60ControlCS);
     LogObject.uart_send_str(F("ENC28J60::init DEBUG:miso = "));
@@ -172,7 +187,7 @@ void Enc28J60Network::init(uint8_t* macaddr)
       _spi.frequency(7000000);    // 7MHz
     #endif
   #endif
-#else
+#elif !defined(STM32F103xB)
   #if ACTLOGLEVEL>=LOG_DEBUG
     LogObject.uart_send_strln(F("ENC28J60::init DEBUG:Use Native hardware SPI"));
   #endif
@@ -661,31 +676,39 @@ uint8_t Enc28J60Network::readByte(uint16_t addr)
   #endif
   writeRegPair(ERDPTL, addr);
 
-  CSACTIVE;
-  #if ENC28J60_USE_SPILIB
-    // issue read command
-    #if defined(ARDUINO)
-      SPI.transfer(ENC28J60_READ_BUF_MEM);
-      // read data
-      uint8_t c = SPI.transfer(0x00);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(ENC28J60_READ_BUF_MEM);
-      // read data
-      uint8_t c = _spi.write(0x00);
-    #endif
-    CSPASSIVE;
-    return (c);
+  #if defined(STM32F103xB)
+    SS_SELECT();
+    spiTxRx(ENC28J60_READ_BUF_MEM);
+    uint8_t c = spiTxRx(0x00);
+    SS_DESELECT();
+    return c;
   #else
-    // issue read command
-    SPDR = ENC28J60_READ_BUF_MEM;
-    waitspi();
-    // read data
-    SPDR = 0x00;
-    waitspi();
-    CSPASSIVE;
-    return (SPDR);
-  #endif  
+    CSACTIVE;
+    #if ENC28J60_USE_SPILIB
+      // issue read command
+      #if defined(ARDUINO)
+        SPI.transfer(ENC28J60_READ_BUF_MEM);
+        // read data
+        uint8_t c = SPI.transfer(0x00);
+      #endif
+      #if defined(__MBED__)
+        _spi.write(ENC28J60_READ_BUF_MEM);
+        // read data
+        uint8_t c = _spi.write(0x00);
+      #endif
+      CSPASSIVE;
+      return (c);
+    #else
+      // issue read command
+      SPDR = ENC28J60_READ_BUF_MEM;
+      waitspi();
+      // read data
+      SPDR = 0x00;
+      waitspi();
+      CSPASSIVE;
+      return (SPDR);
+    #endif  
+  #endif
 }
 
 void Enc28J60Network::writeByte(uint16_t addr, uint8_t data)
@@ -698,28 +721,35 @@ void Enc28J60Network::writeByte(uint16_t addr, uint8_t data)
   #endif
   writeRegPair(EWRPTL, addr);
 
-  CSACTIVE;
-  #if ENC28J60_USE_SPILIB
-    // issue write command
-    #if defined(ARDUINO)
-      SPI.transfer(ENC28J60_WRITE_BUF_MEM);
-      // write data
-      SPI.transfer(data);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(ENC28J60_WRITE_BUF_MEM);
-      // write data
-      _spi.write(data);
-    #endif
+  #if defined(STM32F103xB)
+    SS_SELECT();
+    spiTxRx(ENC28J60_WRITE_BUF_MEM);
+    spiTxRx(data);
+    SS_DESELECT();
   #else
-    // issue write command
-    SPDR = ENC28J60_WRITE_BUF_MEM;
-    waitspi();
-    // write data
-    SPDR = data;
-    waitspi();
+    CSACTIVE;
+    #if ENC28J60_USE_SPILIB
+      // issue write command
+      #if defined(ARDUINO)
+        SPI.transfer(ENC28J60_WRITE_BUF_MEM);
+        // write data
+        SPI.transfer(data);
+      #endif
+      #if defined(__MBED__)
+        _spi.write(ENC28J60_WRITE_BUF_MEM);
+        // write data
+        _spi.write(data);
+      #endif
+    #else
+      // issue write command
+      SPDR = ENC28J60_WRITE_BUF_MEM;
+      waitspi();
+      // write data
+      SPDR = data;
+      waitspi();
+    #endif
+    CSPASSIVE;
   #endif
-  CSPASSIVE;
 }
 
 void
@@ -802,54 +832,81 @@ Enc28J60Network::freePacket(void)
     setERXRDPT();
 }
 
+#if defined(STM32F103xB)
+uint8_t
+Enc28J60Network::spiTxRx(uint8_t transmitByte)
+{
+	#if ACTLOGLEVEL>=LOG_DEBUG_V3
+		LogObject.uart_send_strln(F("Enc28J60Network::spiTxRx(uint8_t transmitByte) DEBUG_V3:Function started"));
+	#endif
+	uint8_t receiveByte = 0;
+	if (HAL_SPI_TransmitReceive(&hspi1, (uint8_t*) &transmitByte, (uint8_t*) &receiveByte, 1, 0x1000) != HAL_OK) {
+		#if ACTLOGLEVEL>=LOG_ERROR
+		  LogObject.uart_send_strln(F("Enc28J60Network::spiTxRx(uint8_t transmitByte) ERROR:SPI ERROR !!"));
+		#endif
+	}
+	return receiveByte;
+}
+#endif
+
 uint8_t
 Enc28J60Network::readOp(uint8_t op, uint8_t address)
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("Enc28J60Network::readOp(uint8_t op, uint8_t address) DEBUG_V3:Function started"));
   #endif
-  CSACTIVE;
-  // issue read command
-  #if ENC28J60_USE_SPILIB
-    #if defined(ARDUINO)
-      SPI.transfer(op | (address & ADDR_MASK));
-      // read data
-      if(address & 0x80)
-        {
-        // do dummy read if needed (for mac and mii, see datasheet page 29)
-        SPI.transfer(0x00);
-        }
-      uint8_t c = SPI.transfer(0x00);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(op | (address & ADDR_MASK));
-      // read data
-      if(address & 0x80)
-        {
-        // do dummy read if needed (for mac and mii, see datasheet page 29)
-        _spi.write(0x00);
-        }
-      uint8_t c = _spi.write(0x00);
-    #endif
-    // release CS
-    CSPASSIVE;
-    return(c);
+  #if defined(STM32F103xB)
+    uint8_t result;
+    SS_SELECT();
+    spiTxRx(op | (address & ADDR_MASK));
+    if (address & 0x80) spiTxRx(0x00); // skip dummy byte if MAC or MII registers
+    result = spiTxRx(0x00);
+    SS_DESELECT();
+    return result;
   #else
-    // issue read command
-    SPDR = op | (address & ADDR_MASK);
-    waitspi();
-    // read data
-    SPDR = 0x00;
-    waitspi();
-    // do dummy read if needed (for mac and mii, see datasheet page 29)
-    if(address & 0x80)
-      {
-      SPDR = 0x00;
-      waitspi();
-      }
-    // release CS
-    CSPASSIVE;
-    return(SPDR);
+	  CSACTIVE;
+	  // issue read command
+	  #if ENC28J60_USE_SPILIB
+	    #if defined(ARDUINO)
+	      SPI.transfer(op | (address & ADDR_MASK));
+	      // read data
+	      if(address & 0x80)
+	        {
+	        // do dummy read if needed (for mac and mii, see datasheet page 29)
+	        SPI.transfer(0x00);
+	        }
+	      uint8_t c = SPI.transfer(0x00);
+	    #endif
+	    #if defined(__MBED__)
+	      _spi.write(op | (address & ADDR_MASK));
+	      // read data
+	      if(address & 0x80)
+	        {
+	        // do dummy read if needed (for mac and mii, see datasheet page 29)
+	        _spi.write(0x00);
+	        }
+	      uint8_t c = _spi.write(0x00);
+	    #endif
+	    // release CS
+	    CSPASSIVE;
+	    return(c);
+	  #else
+	    // issue read command
+	    SPDR = op | (address & ADDR_MASK);
+	    waitspi();
+	    // read data
+	    SPDR = 0x00;
+	    waitspi();
+	    // do dummy read if needed (for mac and mii, see datasheet page 29)
+	    if(address & 0x80)
+	      {
+	      SPDR = 0x00;
+	      waitspi();
+	      }
+	    // release CS
+	    CSPASSIVE;
+	    return(SPDR);
+	  #endif
   #endif
   #if defined(ESP8266)
      yield();
@@ -862,28 +919,36 @@ Enc28J60Network::writeOp(uint8_t op, uint8_t address, uint8_t data)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("Enc28J60Network::writeOp(uint8_t op, uint8_t address, uint8_t data) DEBUG_V3:Function started"));
   #endif
-  CSACTIVE;
-  // issue write command
-  #if ENC28J60_USE_SPILIB
-    #if defined(ARDUINO)
-      SPI.transfer(op | (address & ADDR_MASK));
-      // write data
-      SPI.transfer(data);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(op | (address & ADDR_MASK));
-      // write data
-      _spi.write(data);
-    #endif
-  #else
+  #if defined(STM32F103xB)
+    SS_SELECT();
     // issue write command
-    SPDR = op | (address & ADDR_MASK);
-    waitspi();
-    // write data
-    SPDR = data;
-    waitspi();
+    spiTxRx(op | (address & ADDR_MASK));
+    spiTxRx(data);
+    SS_DESELECT();
+  #else
+    CSACTIVE;
+    // issue write command
+    #if ENC28J60_USE_SPILIB
+      #if defined(ARDUINO)
+        SPI.transfer(op | (address & ADDR_MASK));
+        // write data
+        SPI.transfer(data);
+      #endif
+      #if defined(__MBED__)
+        _spi.write(op | (address & ADDR_MASK));
+        // write data
+        _spi.write(data);
+      #endif
+    #else
+      // issue write command
+      SPDR = op | (address & ADDR_MASK);
+      waitspi();
+      // write data
+      SPDR = data;
+      waitspi();
+    #endif
+    CSPASSIVE;
   #endif
-  CSPASSIVE;
   #if defined(ESP8266)
      yield();
   #endif
@@ -895,39 +960,50 @@ Enc28J60Network::readBuffer(uint16_t len, uint8_t* data)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("Enc28J60Network::readBuffer(uint16_t len, uint8_t* data) DEBUG_V3:Function started"));
   #endif
-  CSACTIVE;
-  // issue read command
-  #if ENC28J60_USE_SPILIB  
-    #if defined(ARDUINO)
-      SPI.transfer(ENC28J60_READ_BUF_MEM);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(ENC28J60_READ_BUF_MEM);
-    #endif
-  #else
-    SPDR = ENC28J60_READ_BUF_MEM;
-    waitspi();
-  #endif
-  while(len)
-    {
+  #if defined(STM32F103xB)
+    SS_SELECT();
+    spiTxRx(ENC28J60_READ_BUF_MEM);
+    while (len) {
     len--;
-    // read data
-    #if ENC28J60_USE_SPILIB    
-      #if defined(ARDUINO)
-        *data = SPI.transfer(0x00);
-      #endif
-      #if defined(__MBED__)
-        *data = _spi.write(0x00);
-      #endif
-    #else
-      SPDR = 0x00;
-      waitspi();
-      *data = SPDR;
-    #endif    
+    *data = spiTxRx(0x00);
     data++;
     }
-  //*data='\0';
-  CSPASSIVE;
+    SS_DESELECT();
+  #else
+    CSACTIVE;
+    // issue read command
+    #if ENC28J60_USE_SPILIB
+      #if defined(ARDUINO)
+        SPI.transfer(ENC28J60_READ_BUF_MEM);
+      #endif
+      #if defined(__MBED__)
+        _spi.write(ENC28J60_READ_BUF_MEM);
+      #endif
+    #else
+      SPDR = ENC28J60_READ_BUF_MEM;
+      waitspi();
+    #endif
+    while(len)
+      {
+      len--;
+      // read data
+      #if ENC28J60_USE_SPILIB
+        #if defined(ARDUINO)
+          *data = SPI.transfer(0x00);
+        #endif
+        #if defined(__MBED__)
+          *data = _spi.write(0x00);
+        #endif
+      #else
+        SPDR = 0x00;
+        waitspi();
+        *data = SPDR;
+      #endif
+      data++;
+      }
+    //*data='\0';
+    CSPASSIVE;
+  #endif
 }
 
 void
@@ -936,38 +1012,49 @@ Enc28J60Network::writeBuffer(uint16_t len, uint8_t* data)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("Enc28J60Network::writeBuffer(uint16_t len, uint8_t* data) DEBUG_V3:Function started"));
   #endif
-  CSACTIVE;
-  // issue write command
-  #if ENC28J60_USE_SPILIB  
-    #if defined(ARDUINO)
-      SPI.transfer(ENC28J60_WRITE_BUF_MEM);
-    #endif
-    #if defined(__MBED__)
-      _spi.write(ENC28J60_WRITE_BUF_MEM);
-    #endif
-  #else
-    SPDR = ENC28J60_WRITE_BUF_MEM;
-    waitspi();
-  #endif
-  while(len)
-    {
+  #if defined(STM32F103xB)
+    SS_SELECT();
+    spiTxRx(ENC28J60_WRITE_BUF_MEM);
+    while (len) {
     len--;
-    // write data
-    #if ENC28J60_USE_SPILIB  
+    spiTxRx(*data);
+    data++;
+    }
+    SS_DESELECT();
+  #else
+    CSACTIVE;
+    // issue write command
+    #if ENC28J60_USE_SPILIB
       #if defined(ARDUINO)
-        SPI.transfer(*data);
+        SPI.transfer(ENC28J60_WRITE_BUF_MEM);
       #endif
       #if defined(__MBED__)
-        _spi.write(*data);
+        _spi.write(ENC28J60_WRITE_BUF_MEM);
       #endif
-      data++;
     #else
-      SPDR = *data;
-      data++;
+      SPDR = ENC28J60_WRITE_BUF_MEM;
       waitspi();
     #endif
-    }
-  CSPASSIVE;
+    while(len)
+      {
+      len--;
+      // write data
+      #if ENC28J60_USE_SPILIB
+        #if defined(ARDUINO)
+          SPI.transfer(*data);
+        #endif
+        #if defined(__MBED__)
+          _spi.write(*data);
+        #endif
+        data++;
+      #else
+        SPDR = *data;
+        data++;
+        waitspi();
+      #endif
+      }
+    CSPASSIVE;
+  #endif
 }
 
 void
@@ -1097,39 +1184,49 @@ Enc28J60Network::chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t
   #endif
   uint16_t t;
   len = setReadPtr(handle, pos, len)-1;
-  CSACTIVE;
-  // issue read command
-  #if ENC28J60_USE_SPILIB
-    #if defined(ARDUINO)
-    SPI.transfer(ENC28J60_READ_BUF_MEM);
-    #endif
-    #if defined(__MBED__)
-    _spi.write(ENC28J60_READ_BUF_MEM);
-    #endif
+  #if defined(STM32F103xB)
+    SS_SELECT();
+    spiTxRx(ENC28J60_READ_BUF_MEM);
   #else
-    SPDR = ENC28J60_READ_BUF_MEM;
-    waitspi();
+    CSACTIVE;
+    // issue read command
+    #if ENC28J60_USE_SPILIB
+      #if defined(ARDUINO)
+      SPI.transfer(ENC28J60_READ_BUF_MEM);
+      #endif
+      #if defined(__MBED__)
+      _spi.write(ENC28J60_READ_BUF_MEM);
+      #endif
+    #else
+      SPDR = ENC28J60_READ_BUF_MEM;
+      waitspi();
+    #endif
   #endif
   uint16_t i;
   for (i = 0; i < len; i+=2)
     {
     // read data
-    #if ENC28J60_USE_SPILIB
-      #if defined(ARDUINO)
-        t = SPI.transfer(0x00) << 8;
-        t += SPI.transfer(0x00);
-      #endif
-      #if defined(__MBED__)
-        t = _spi.write(0x00) << 8;
-        t += _spi.write(0x00);
-      #endif
+    #if defined(STM32F103xB)
+      t = spiTxRx(0x00) << 8;
+      t += spiTxRx(0x00);
     #else
-      SPDR = 0x00;
-      waitspi();
-      t = SPDR << 8;
-      SPDR = 0x00;
-      waitspi();
-      t += SPDR;
+      #if ENC28J60_USE_SPILIB
+        #if defined(ARDUINO)
+          t = SPI.transfer(0x00) << 8;
+          t += SPI.transfer(0x00);
+        #endif
+        #if defined(__MBED__)
+          t = _spi.write(0x00) << 8;
+          t += _spi.write(0x00);
+        #endif
+      #else
+        SPDR = 0x00;
+        waitspi();
+        t = SPDR << 8;
+        SPDR = 0x00;
+        waitspi();
+        t += SPDR;
+      #endif
     #endif
     sum += t;
     if(sum < t)
@@ -1139,25 +1236,33 @@ Enc28J60Network::chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t
     }
   if(i == len)
     {
-    #if ENC28J60_USE_SPILIB  
-      #if defined(ARDUINO)
-        t = (SPI.transfer(0x00) << 8) + 0;
-      #endif
-      #if defined(__MBED__)
-        t = (_spi.write(0x00) << 8) + 0;
-      #endif
+    #if defined(STM32F103xB)
+      t = (spiTxRx(0x00) << 8) + 0;
     #else
-      SPDR = 0x00;
-      waitspi();
-      t = (SPDR << 8) + 0;
-    #endif    
+      #if ENC28J60_USE_SPILIB
+        #if defined(ARDUINO)
+          t = (SPI.transfer(0x00) << 8) + 0;
+        #endif
+        #if defined(__MBED__)
+          t = (_spi.write(0x00) << 8) + 0;
+        #endif
+      #else
+        SPDR = 0x00;
+        waitspi();
+        t = (SPDR << 8) + 0;
+      #endif
+    #endif
     sum += t;
     if(sum < t)
       {
       sum++;            /* carry */
       }
     }
-  CSPASSIVE;
+  #if defined(STM32F103xB)
+    SS_DESELECT();
+  #else
+    CSPASSIVE;
+  #endif
 
   /* Return sum in host byte order. */
   return sum;

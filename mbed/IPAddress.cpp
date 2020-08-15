@@ -27,6 +27,10 @@
   #include "mbed/Print.h"
   #include "mbed/IPAddress.h"
 #endif
+#if defined(STM32F103xB)
+  #include "mbed/Print.h"
+  #include "mbed/IPAddress.h"
+#endif
 
 IPAddress::IPAddress()
 {

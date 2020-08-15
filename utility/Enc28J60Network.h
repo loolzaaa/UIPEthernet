@@ -143,7 +143,7 @@ extern uint8_t ENC28J60ControlCS;
       #define SPI_MOSI PIN_SPI_MOSI
    #endif
 #endif
-#if !defined(SPI_MOSI)
+#if !defined(SPI_MOSI) && !defined(STM32F103xB)
    #error "Not defined SPI_MOSI!"
 #endif
 
@@ -172,7 +172,7 @@ extern uint8_t ENC28J60ControlCS;
       #define SPI_MISO PIN_SPI_MISO
    #endif
 #endif
-#if !defined(SPI_MISO)
+#if !defined(SPI_MISO) && !defined(STM32F103xB)
    #error "Not defined SPI_MISO!"
 #endif
 #if !defined(SPI_SCK)
@@ -200,7 +200,7 @@ extern uint8_t ENC28J60ControlCS;
       #define SPI_SCK PIN_SPI_SCK
    #endif
 #endif
-#if !defined(SPI_SCK)
+#if !defined(SPI_SCK) && !defined(STM32F103xB)
    #error "Not defined SPI_SCK!"
 #endif
 
@@ -211,6 +211,15 @@ extern uint8_t ENC28J60ControlCS;
       #include <SPI.h>
    #endif
    #define ENC28J60_USE_SPILIB 1
+#endif
+
+#if defined(STM32F103xB)
+	#include "stm32f1xx_hal.h"
+   #define delay(x) HAL_Delay(x)
+	#define CS_GPIO_PORT GPIOA
+	#define CS_PIN GPIO_PIN_4
+	#define SS_SELECT() HAL_GPIO_WritePin(CS_GPIO_PORT, CS_PIN, GPIO_PIN_RESET)
+	#define SS_DESELECT() HAL_GPIO_WritePin(CS_GPIO_PORT, CS_PIN, GPIO_PIN_SET)
 #endif
 
 #define UIP_RECEIVEBUFFERHANDLE 0xff
@@ -234,6 +243,9 @@ private:
 
   static bool broadcast_enabled; //!< True if broadcasts enabled (used to allow temporary disable of broadcast for DHCP or other internal functions)
 
+#if defined(STM32F103xB)  
+  static uint8_t spiTxRx(uint8_t transmitByte);
+#endif
   static uint8_t readOp(uint8_t op, uint8_t address);
   static void writeOp(uint8_t op, uint8_t address, uint8_t data);
   static uint16_t setReadPtr(memhandle handle, memaddress position, uint16_t len);
@@ -268,7 +280,11 @@ public:
   uint16_t PhyStatus(void);
   static bool linkStatus(void);
 
+#if defined(STM32F103xB)
+  static void init(const SPI_HandleTypeDef *spiStruct, uint8_t* macaddr);
+#else
   static void init(uint8_t* macaddr);
+#endif
   static memhandle receivePacket(void);
   static void freePacket(void);
   static memaddress blockSize(memhandle handle);

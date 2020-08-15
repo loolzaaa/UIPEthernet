@@ -39,6 +39,11 @@ extern "C"
    #include "mbed/millis.h"
 #endif
 
+#if defined(STM32F103xB)
+  #include "stm32f1xx_hal.h"
+  #define millis() HAL_GetTick()
+#endif
+
 #define UIP_TCP_PHYH_LEN UIP_LLH_LEN+UIP_IPTCPH_LEN
 
 uip_userdata_t UIPClient::all_data[UIP_CONNS];

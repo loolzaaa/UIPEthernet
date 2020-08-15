@@ -14,6 +14,11 @@
   #include "mbed/millis.h"
   #define delay(x) wait_ms(x)
 #endif
+#if defined(STM32F103xB)
+  #include "stm32f1xx_hal.h"
+  #define millis() HAL_GetTick()
+  #define delay(x) HAL_Delay(x)
+#endif
 #include "utility/logging.h"
 #include "utility/uip.h"
 

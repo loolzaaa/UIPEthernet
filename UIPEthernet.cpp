@@ -67,7 +67,11 @@ void UIPEthernetClass::init(const uint8_t pin)
 
 #if UIP_UDP
 int
+#if defined(STM32F103xB)
+  UIPEthernetClass::begin(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac)
+#else
 UIPEthernetClass::begin(const uint8_t* mac)
+#endif
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac) DEBUG_V3:Function started"));
@@ -76,7 +80,11 @@ UIPEthernetClass::begin(const uint8_t* mac)
   // I leave it there commented for history. It is bring all GCC "new" memory allocation code, making the *.bin almost 40K bigger. I've move it globally.
   _dhcp = &s_dhcp;
   // Initialise the basic info
+#if defined(STM32F103xB)
+  netInit(spiStruct, mac);
+#else
   netInit(mac);
+#endif
 
   // Now try to get our config info from a DHCP server
   int ret = _dhcp->beginWithDHCP((uint8_t*)mac);
@@ -91,44 +99,76 @@ UIPEthernetClass::begin(const uint8_t* mac)
 #endif
 
 void
+#if defined(STM32F103xB)
+  UIPEthernetClass::begin(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac, IPAddress ip)
+#else
 UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip)
+#endif
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip) DEBUG_V3:Function started"));
   #endif
   IPAddress dns = ip;
   dns[3] = 1;
+#if defined(STM32F103xB)
+  begin(spiStruct, mac, ip, dns);
+#else
   begin(mac, ip, dns);
+#endif
 }
 
 void
+#if defined(STM32F103xB)
+  UIPEthernetClass::begin(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac, IPAddress ip, IPAddress dns)
+#else
 UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns)
+#endif
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns) DEBUG_V3:Function started"));
   #endif
   IPAddress gateway = ip;
   gateway[3] = 1;
+#if defined(STM32F103xB)
+  begin(spiStruct, mac, ip, dns, gateway);
+#else
   begin(mac, ip, dns, gateway);
+#endif
 }
 
 void
+#if defined(STM32F103xB)
+  UIPEthernetClass::begin(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway)
+#else
 UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway)
+#endif
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway) DEBUG_V3:Function started"));
   #endif
   IPAddress subnet(255, 255, 255, 0);
+#if defined(STM32F103xB)
+  begin(spiStruct, mac, ip, dns, gateway, subnet);
+#else
   begin(mac, ip, dns, gateway, subnet);
+#endif
 }
 
 void
+#if defined(STM32F103xB)
+UIPEthernetClass::begin(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet)
+#else
 UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet)
+#endif
 {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet) DEBUG_V3:Function started"));
   #endif
+#if defined(STM32F103xB)
+  netInit(spiStruct, mac);
+#else
   netInit(mac);
+#endif
   configure(ip,dns,gateway,subnet);
 }
 
@@ -413,13 +453,21 @@ sendandfree:
   return true;
 }
 
+#if defined(STM32F103xB)
+void UIPEthernetClass::netInit(const SPI_HandleTypeDef *spiStruct, const uint8_t* mac) {
+#else
 void UIPEthernetClass::netInit(const uint8_t* mac) {
+#endif
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::netInit(const uint8_t* mac) DEBUG_V3:Function started"));
   #endif
   periodic_timer = millis() + UIP_PERIODIC_TIMER;
 
+#if defined(STM32F103xB)
+  Enc28J60Network::init((SPI_HandleTypeDef*)spiStruct, (uint8_t*)mac);
+#else
   Enc28J60Network::init((uint8_t*)mac);
+#endif
   uip_seteth_addr(mac);
 
   uip_init();
