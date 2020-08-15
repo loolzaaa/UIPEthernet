@@ -7,6 +7,10 @@
 #if defined(__MBED__)
   #include <mbed.h>
 #endif
+#if defined(STM32F103xB)
+  #include <cube/Logger.h>
+  extern UART_HandleTypeDef huart1;
+#endif
 
 #define	LOG_NONE		-1	/* Logging nothing */
 #define	LOG_EMERG		0	/* system is unusable */
@@ -57,11 +61,16 @@
      #define uart_send_binln(x) printf("%B\r\n",x)
      #define uart_send_buf_len(buf,len) printf("%.*s",len,buf);
    #endif
+   #if defined(STM32F103xB)
+     #define LogObject logger
+   #endif
 #endif
 
 #if defined(__MBED__) || defined(STM32_MCU_SERIES) || defined(__STM32F1__) || defined(__STM32F3__) || defined(__STM32F4__)
   #define F(x) (const char *)(x)
   #define FP(x) (const char *)(x)
+#elif defined(STM32F103xB)
+  #define F(x) (const char *)(x)
 #else
   #define FP(x)     (__FlashStringHelper*)(x)         // Helper
 #endif
